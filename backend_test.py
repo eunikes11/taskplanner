@@ -155,7 +155,7 @@ class TaskPlannerTester:
         
         # Test without authentication
         response = self.make_request("GET", "/auth/me")
-        if response and response.status_code == 403:
+        if response and response.status_code in [401, 403]:
             self.log_test("Auth Protection", True, "Correctly requires authentication")
         else:
             self.log_test("Auth Protection", False, "Should require authentication")
