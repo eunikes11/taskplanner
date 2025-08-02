@@ -206,12 +206,17 @@ const WelcomeInstructions = ({ onClose }) => {
           </div>
 
           <div className="bg-orange-50 p-4 rounded-xl">
-            <h3 className="text-xl font-bold text-orange-700 mb-2">📊 Step 5: Track Progress</h3>
+            <h3 className="text-xl font-bold text-orange-700 mb-2">⏰ Step 5: Add Breaks</h3>
+            <p className="text-gray-700">Click on a task to select it, then add a break after it. Set how many minutes you need!</p>
+          </div>
+
+          <div className="bg-pink-50 p-4 rounded-xl">
+            <h3 className="text-xl font-bold text-pink-700 mb-2">📊 Step 6: Track Progress</h3>
             <p className="text-gray-700">Click "Dashboard" to see how well you did each day this week!</p>
           </div>
 
           <div className="bg-yellow-50 p-4 rounded-xl">
-            <h3 className="text-xl font-bold text-yellow-700 mb-2">🎉 Step 6: Celebrate!</h3>
+            <h3 className="text-xl font-bold text-yellow-700 mb-2">🎉 Step 7: Celebrate!</h3>
             <p className="text-gray-700">When you finish all tasks, you'll get a special celebration message!</p>
           </div>
         </div>
