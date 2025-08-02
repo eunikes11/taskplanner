@@ -67,9 +67,14 @@ class TaskPlannerTester:
         """Test user registration endpoint"""
         print("\n=== Testing User Registration ===")
         
+        # Use timestamp to ensure unique username
+        import time
+        timestamp = str(int(time.time()))
+        unique_username = f"student_{timestamp}"
+        
         # Test successful registration
         user_data = {
-            "username": "emma_student",
+            "username": unique_username,
             "password": "myschoolwork123"
         }
         
