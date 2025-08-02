@@ -468,6 +468,70 @@ const TaskManager = () => {
     }
   };
 
+  const addBreakTask = async () => {
+    if (breakMinutes <= 0) return;
+
+    const breakTitle = `Break for ${breakMinutes} minute${breakMinutes !== 1 ? 's' : ''}`;
+    
+    try {
+      const response = await api.post(`${API}/tasks`, { 
+        title: breakTitle,
+        task_date: selectedDate
+      });
+      
+      if (response.data && selectedTaskId) {
+        // Find the selected task index
+        const selectedTaskIndex = tasks.findIndex(task => task.id === selectedTaskId);
+        
+        if (selectedTaskIndex !== -1) {
+          // Reorder tasks to put break after selected task
+          const newTasks = [...tasks];
+          const breakTask = response.data;
+          
+          // Insert break task after selected task
+          const insertIndex = selectedTaskIndex + 1;
+          
+          // Update order indices for reordering
+          const taskOrders = [];
+          let orderIndex = 0;
+          
+          for (let i = 0; i < newTasks.length; i++) {
+            if (i === insertIndex) {
+              // Insert break task here
+              taskOrders.push({
+                id: breakTask.id,
+                order_index: orderIndex++
+              });
+            }
+            
+            taskOrders.push({
+              id: newTasks[i].id,
+              order_index: orderIndex++
+            });
+          }
+          
+          // If we're inserting at the end
+          if (insertIndex >= newTasks.length) {
+            taskOrders.push({
+              id: breakTask.id,
+              order_index: orderIndex
+            });
+          }
+          
+          // Reorder tasks on backend
+          await api.post(`${API}/tasks/reorder`, { task_orders: taskOrders });
+        }
+      }
+      
+      // Clear selection and refresh
+      setSelectedTaskId(null);
+      fetchTasks();
+      fetchStats();
+    } catch (error) {
+      console.error('Error adding break task:', error);
+    }
+  };
+
   const toggleTask = async (taskId, completed) => {
     try {
       await api.put(`${API}/tasks/${taskId}`, { completed });
