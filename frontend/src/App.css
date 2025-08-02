@@ -58,6 +58,10 @@ body {
   @apply w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-full flex items-center justify-center text-sm font-bold;
 }
 
+.task-number-break {
+  @apply w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 text-white rounded-full flex items-center justify-center text-sm font-bold;
+}
+
 /* Custom Checkbox */
 .task-checkbox {
   @apply w-8 h-8 border-2 border-purple-400 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 hover:border-purple-600;
