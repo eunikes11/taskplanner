@@ -758,6 +758,41 @@ const TaskManager = () => {
                 Add Task 🚀
               </button>
             </form>
+
+            {/* Break Controls */}
+            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-xl border-2 border-blue-200">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">⏰ Add Break Time</h3>
+              <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <div className="flex items-center space-x-2">
+                  <label className="text-lg font-semibold text-gray-700">Minutes:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={breakMinutes}
+                    onChange={(e) => setBreakMinutes(parseInt(e.target.value) || 25)}
+                    className="w-20 px-3 py-2 border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center font-bold"
+                  />
+                  <span className="text-gray-600">mins</span>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={addBreakTask}
+                  className="bg-gradient-to-r from-blue-500 to-green-500 text-white font-bold py-2 px-6 rounded-xl hover:from-blue-600 hover:to-green-600 transition duration-300 transform hover:scale-105"
+                >
+                  Add Break ⏱️
+                </button>
+              </div>
+              
+              <div className="mt-3 text-sm text-gray-600">
+                {selectedTaskId ? (
+                  <p>✨ Break will be added after the selected task (highlighted in blue)</p>
+                ) : (
+                  <p>💡 Click on a task to select it, then add a break after it. Or add break at the end!</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
