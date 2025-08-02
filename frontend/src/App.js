@@ -828,24 +828,43 @@ const TaskManager = () => {
                 onDragStart={(e) => handleDragStart(e, task)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, task)}
+                onClick={() => handleTaskSelect(task.id)}
                 className={`task-card ${task.completed ? 'task-completed' : ''} ${
+                  selectedTaskId === task.id ? 'task-selected' : ''
+                } ${
                   (isToday || selectedDate >= new Date().toISOString().split('T')[0]) ? 'cursor-move' : ''
-                }`}
+                } ${task.title.startsWith('Break for') ? 'task-break' : ''}`}
               >
                 <div className="flex items-center space-x-4">
                   <div className="flex-shrink-0">
-                    <div className="task-number">{index + 1}</div>
+                    <div className={`task-number ${task.title.startsWith('Break for') ? 'task-number-break' : ''}`}>
+                      {task.title.startsWith('Break for') ? '⏱️' : index + 1}
+                    </div>
                   </div>
                   
                   <div className="flex-grow">
                     <div className={`text-lg font-medium ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}>
                       {task.title}
                     </div>
+                    {task.title.startsWith('Break for') && !task.completed && (
+                      <div className="text-sm text-blue-600 mt-1">
+                        Take a well-deserved break! 🌟
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-2">
+                    {selectedTaskId === task.id && (
+                      <div className="text-blue-500 font-bold text-sm bg-blue-100 px-2 py-1 rounded-full">
+                        Selected
+                      </div>
+                    )}
+                    
                     <button
-                      onClick={() => toggleTask(task.id, !task.completed)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTask(task.id, !task.completed);
+                      }}
                       className={`task-checkbox ${task.completed ? 'task-checkbox-completed' : ''}`}
                     >
                       {task.completed && <span className="checkmark">✓</span>}
@@ -853,7 +872,10 @@ const TaskManager = () => {
                     
                     {(isToday || selectedDate >= new Date().toISOString().split('T')[0]) && (
                       <button
-                        onClick={() => deleteTask(task.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTask(task.id);
+                        }}
                         className="text-red-500 hover:text-red-700 text-xl p-1"
                       >
                         🗑️
