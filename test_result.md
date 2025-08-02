@@ -246,12 +246,12 @@ metadata:
 
 test_plan:
   current_focus:
-    - "User Authentication System"
-    - "Task CRUD API Endpoints"
-    - "MongoDB Integration"
     - "Authentication UI Components"
     - "Task Input and Management"
     - "Drag and Drop Reordering"
+    - "PDF Export Functionality"
+    - "Interactive Checklist and Motivational Messages"
+    - "Kid-Friendly UI Design"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
