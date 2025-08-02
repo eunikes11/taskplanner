@@ -573,7 +573,9 @@ const TaskManager = () => {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = async (e, targetTask) => {
+  const handleTaskSelect = (taskId) => {
+    setSelectedTaskId(selectedTaskId === taskId ? null : taskId);
+  };
     e.preventDefault();
     
     if (!draggedTask || draggedTask.id === targetTask.id) return;
