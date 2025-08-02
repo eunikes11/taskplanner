@@ -771,7 +771,7 @@ class TaskPlannerTester:
         print(f"Testing against: {self.base_url}")
         print("=" * 60)
         
-        # Run tests in logical order
+        # Run original tests first
         self.test_user_registration()
         self.test_user_login()
         self.test_get_current_user()
@@ -782,6 +782,18 @@ class TaskPlannerTester:
         self.test_task_statistics()
         self.test_task_deletion()
         self.test_authentication_protection()
+        
+        # Run new date-based and analytics tests
+        print("\n" + "=" * 60)
+        print("🆕 TESTING NEW DATE-BASED FEATURES")
+        print("=" * 60)
+        
+        self.test_date_based_task_creation()
+        self.test_date_specific_task_retrieval()
+        self.test_task_history_api()
+        self.test_weekly_progress_api()
+        self.test_date_specific_statistics()
+        self.test_date_isolation_and_user_isolation()
         
         # Print summary
         print("\n" + "=" * 60)
