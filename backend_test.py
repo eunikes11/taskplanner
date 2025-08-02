@@ -7,7 +7,7 @@ Tests authentication, task management, and all API endpoints
 import requests
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 # Backend URL from environment
 BACKEND_URL = "https://48d75d83-1859-4f4a-a9fd-7e015b313cd1.preview.emergentagent.com/api"
