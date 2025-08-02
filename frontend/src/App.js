@@ -576,6 +576,8 @@ const TaskManager = () => {
   const handleTaskSelect = (taskId) => {
     setSelectedTaskId(selectedTaskId === taskId ? null : taskId);
   };
+
+  const handleDrop = async (e, targetTask) => {
     e.preventDefault();
     
     if (!draggedTask || draggedTask.id === targetTask.id) return;
