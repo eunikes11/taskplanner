@@ -106,9 +106,9 @@ class TaskPlannerTester:
         """Test user login endpoint"""
         print("\n=== Testing User Login ===")
         
-        # Test successful login
+        # Test successful login with the registered user
         login_data = {
-            "username": "emma_student",
+            "username": self.username,
             "password": "myschoolwork123"
         }
         
@@ -116,7 +116,7 @@ class TaskPlannerTester:
         
         if response and response.status_code == 200:
             data = response.json()
-            if "access_token" in data and data["username"] == "emma_student":
+            if "access_token" in data and data["username"] == self.username:
                 self.log_test("User Login", True, f"Successfully logged in user: {data['username']}")
                 # Update token for subsequent tests
                 self.auth_token = data["access_token"]
@@ -128,7 +128,7 @@ class TaskPlannerTester:
         
         # Test invalid credentials
         invalid_login = {
-            "username": "emma_student",
+            "username": self.username,
             "password": "wrongpassword"
         }
         
