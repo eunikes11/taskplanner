@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,10 +7,12 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import uuid
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import jwt
+import bcrypt
+from passlib.context import CryptContext
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,38 +22,223 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# JWT and Password hashing
+SECRET_KEY = "your-secret-key-here-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
 # Create the main app without a prefix
 app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Authentication Models
+class UserCreate(BaseModel):
+    username: str
+    password: str
 
-# Define Models
-class StatusCheck(BaseModel):
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: str
+    username: str
+
+class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    username: str
+    hashed_password: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+# Task Models
+class Task(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    title: str
+    completed: bool = False
+    order_index: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+class TaskCreate(BaseModel):
+    title: str
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    completed: Optional[bool] = None
+    order_index: Optional[int] = None
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+class TaskReorder(BaseModel):
+    task_orders: List[dict]  # [{"id": "task_id", "order_index": 0}, ...]
+
+# Authentication helpers
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    
+    user = await db.users.find_one({"id": user_id})
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return User(**user)
+
+# Authentication Routes
+@api_router.post("/auth/register", response_model=Token)
+async def register(user_data: UserCreate):
+    # Check if user already exists
+    existing_user = await db.users.find_one({"username": user_data.username})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    # Create new user
+    hashed_password = hash_password(user_data.password)
+    user = User(username=user_data.username, hashed_password=hashed_password)
+    
+    await db.users.insert_one(user.dict())
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id}, expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user_id=user.id,
+        username=user.username
+    )
+
+@api_router.post("/auth/login", response_model=Token)
+async def login(user_data: UserLogin):
+    user = await db.users.find_one({"username": user_data.username})
+    if not user or not verify_password(user_data.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["id"]}, expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user_id=user["id"],
+        username=user["username"]
+    )
+
+@api_router.get("/auth/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return {"user_id": current_user.id, "username": current_user.username}
+
+# Task Routes
+@api_router.post("/tasks", response_model=Task)
+async def create_task(task_data: TaskCreate, current_user: User = Depends(get_current_user)):
+    # Get the current max order_index for this user
+    existing_tasks = await db.tasks.find({"user_id": current_user.id}).to_list(1000)
+    max_order = max([t.get("order_index", 0) for t in existing_tasks], default=-1)
+    
+    task = Task(
+        user_id=current_user.id,
+        title=task_data.title,
+        order_index=max_order + 1
+    )
+    
+    await db.tasks.insert_one(task.dict())
+    return task
+
+@api_router.get("/tasks", response_model=List[Task])
+async def get_tasks(current_user: User = Depends(get_current_user)):
+    tasks = await db.tasks.find({"user_id": current_user.id}).to_list(1000)
+    # Sort by order_index
+    tasks_sorted = sorted(tasks, key=lambda x: x.get("order_index", 0))
+    return [Task(**task) for task in tasks_sorted]
+
+@api_router.put("/tasks/{task_id}", response_model=Task)
+async def update_task(task_id: str, task_update: TaskUpdate, current_user: User = Depends(get_current_user)):
+    # Find the task
+    task = await db.tasks.find_one({"id": task_id, "user_id": current_user.id})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Update fields
+    update_data = {}
+    if task_update.title is not None:
+        update_data["title"] = task_update.title
+    if task_update.completed is not None:
+        update_data["completed"] = task_update.completed
+        if task_update.completed:
+            update_data["completed_at"] = datetime.utcnow()
+        else:
+            update_data["completed_at"] = None
+    if task_update.order_index is not None:
+        update_data["order_index"] = task_update.order_index
+    
+    await db.tasks.update_one({"id": task_id}, {"$set": update_data})
+    
+    # Get updated task
+    updated_task = await db.tasks.find_one({"id": task_id})
+    return Task(**updated_task)
+
+@api_router.post("/tasks/reorder")
+async def reorder_tasks(reorder_data: TaskReorder, current_user: User = Depends(get_current_user)):
+    # Update order_index for each task
+    for task_order in reorder_data.task_orders:
+        await db.tasks.update_one(
+            {"id": task_order["id"], "user_id": current_user.id},
+            {"$set": {"order_index": task_order["order_index"]}}
+        )
+    
+    return {"message": "Tasks reordered successfully"}
+
+@api_router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.tasks.delete_one({"id": task_id, "user_id": current_user.id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    return {"message": "Task deleted successfully"}
+
+@api_router.get("/tasks/stats")
+async def get_task_stats(current_user: User = Depends(get_current_user)):
+    tasks = await db.tasks.find({"user_id": current_user.id}).to_list(1000)
+    total_tasks = len(tasks)
+    completed_tasks = len([t for t in tasks if t.get("completed", False)])
+    
+    return {
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "remaining_tasks": total_tasks - completed_tasks,
+        "completion_percentage": (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+    }
 
 # Include the router in the main app
 app.include_router(api_router)
