@@ -411,6 +411,360 @@ class TaskPlannerTester:
             else:
                 self.log_test(f"Auth Protection {method} {endpoint}", False, "Should require authentication")
     
+    def test_date_based_task_creation(self):
+        """Test creating tasks with specific dates"""
+        print("\n=== Testing Date-Based Task Creation ===")
+        
+        if not self.auth_token:
+            self.log_test("Date-Based Task Creation", False, "No auth token available")
+            return
+        
+        # Test creating task for today (default behavior)
+        today = date.today().strftime("%Y-%m-%d")
+        task_data = {"title": "Today's homework assignment"}
+        
+        response = self.make_request("POST", "/tasks", task_data, headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            task = response.json()
+            if task.get("task_date") == today:
+                self.log_test("Default Date Task Creation", True, f"Task created with today's date: {today}")
+            else:
+                self.log_test("Default Date Task Creation", False, f"Expected date {today}, got {task.get('task_date')}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Default Date Task Creation", False, f"Failed to create task: {error_msg}")
+        
+        # Test creating task for specific future date
+        future_date = (date.today() + timedelta(days=3)).strftime("%Y-%m-%d")
+        task_data = {"title": "Future science project", "task_date": future_date}
+        
+        response = self.make_request("POST", "/tasks", task_data, headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            task = response.json()
+            if task.get("task_date") == future_date:
+                self.log_test("Future Date Task Creation", True, f"Task created for future date: {future_date}")
+                self.future_task_id = task["id"]
+            else:
+                self.log_test("Future Date Task Creation", False, f"Expected date {future_date}, got {task.get('task_date')}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Future Date Task Creation", False, f"Failed to create future task: {error_msg}")
+        
+        # Test creating task for specific past date
+        past_date = (date.today() - timedelta(days=2)).strftime("%Y-%m-%d")
+        task_data = {"title": "Yesterday's reading assignment", "task_date": past_date}
+        
+        response = self.make_request("POST", "/tasks", task_data, headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            task = response.json()
+            if task.get("task_date") == past_date:
+                self.log_test("Past Date Task Creation", True, f"Task created for past date: {past_date}")
+                self.past_task_id = task["id"]
+            else:
+                self.log_test("Past Date Task Creation", False, f"Expected date {past_date}, got {task.get('task_date')}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Past Date Task Creation", False, f"Failed to create past task: {error_msg}")
+    
+    def test_date_specific_task_retrieval(self):
+        """Test retrieving tasks for specific dates"""
+        print("\n=== Testing Date-Specific Task Retrieval ===")
+        
+        if not self.auth_token:
+            self.log_test("Date-Specific Task Retrieval", False, "No auth token available")
+            return
+        
+        # Test getting tasks for today using query parameter
+        today = date.today().strftime("%Y-%m-%d")
+        response = self.make_request("GET", f"/tasks?task_date={today}", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            tasks = response.json()
+            if isinstance(tasks, list):
+                today_tasks = [t for t in tasks if t.get("task_date") == today]
+                self.log_test("Today Tasks Query Param", True, f"Retrieved {len(today_tasks)} tasks for today")
+            else:
+                self.log_test("Today Tasks Query Param", False, "Response is not a list")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Today Tasks Query Param", False, f"Failed to get today's tasks: {error_msg}")
+        
+        # Test getting tasks for future date using path parameter
+        future_date = (date.today() + timedelta(days=3)).strftime("%Y-%m-%d")
+        response = self.make_request("GET", f"/tasks/date/{future_date}", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            tasks = response.json()
+            if isinstance(tasks, list):
+                future_tasks = [t for t in tasks if t.get("task_date") == future_date]
+                self.log_test("Future Tasks Path Param", True, f"Retrieved {len(future_tasks)} tasks for {future_date}")
+            else:
+                self.log_test("Future Tasks Path Param", False, "Response is not a list")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Future Tasks Path Param", False, f"Failed to get future tasks: {error_msg}")
+        
+        # Test getting tasks for past date
+        past_date = (date.today() - timedelta(days=2)).strftime("%Y-%m-%d")
+        response = self.make_request("GET", f"/tasks?task_date={past_date}", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            tasks = response.json()
+            if isinstance(tasks, list):
+                past_tasks = [t for t in tasks if t.get("task_date") == past_date]
+                self.log_test("Past Tasks Query Param", True, f"Retrieved {len(past_tasks)} tasks for {past_date}")
+            else:
+                self.log_test("Past Tasks Query Param", False, "Response is not a list")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Past Tasks Query Param", False, f"Failed to get past tasks: {error_msg}")
+    
+    def test_task_history_api(self):
+        """Test task history endpoint with different day ranges"""
+        print("\n=== Testing Task History API ===")
+        
+        if not self.auth_token:
+            self.log_test("Task History API", False, "No auth token available")
+            return
+        
+        # Test default 7-day history
+        response = self.make_request("GET", "/tasks/history", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            history = response.json()
+            if isinstance(history, list) and len(history) == 7:
+                self.log_test("Default 7-Day History", True, f"Retrieved 7 days of history")
+                
+                # Verify structure of daily progress
+                if history:
+                    day_progress = history[0]
+                    required_fields = ["date", "total_tasks", "completed_tasks", "completion_percentage", "tasks"]
+                    if all(field in day_progress for field in required_fields):
+                        self.log_test("Daily Progress Structure", True, "Daily progress has all required fields")
+                    else:
+                        self.log_test("Daily Progress Structure", False, f"Missing fields in daily progress: {day_progress}")
+                
+                # Verify dates are in correct order (most recent first)
+                dates = [datetime.strptime(day["date"], "%Y-%m-%d").date() for day in history]
+                if dates == sorted(dates, reverse=True):
+                    self.log_test("History Date Ordering", True, "History dates are properly ordered (newest first)")
+                else:
+                    self.log_test("History Date Ordering", False, "History dates are not properly ordered")
+                    
+            else:
+                self.log_test("Default 7-Day History", False, f"Expected 7 days, got {len(history) if isinstance(history, list) else 'non-list'}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Default 7-Day History", False, f"Failed to get history: {error_msg}")
+        
+        # Test custom day ranges
+        for days in [1, 14, 30]:
+            response = self.make_request("GET", f"/tasks/history?days={days}", headers=self.get_auth_headers())
+            
+            if response and response.status_code == 200:
+                history = response.json()
+                if isinstance(history, list) and len(history) == days:
+                    self.log_test(f"{days}-Day History", True, f"Retrieved {days} days of history")
+                else:
+                    self.log_test(f"{days}-Day History", False, f"Expected {days} days, got {len(history) if isinstance(history, list) else 'non-list'}")
+            else:
+                error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+                self.log_test(f"{days}-Day History", False, f"Failed to get {days}-day history: {error_msg}")
+    
+    def test_weekly_progress_api(self):
+        """Test weekly progress dashboard endpoint"""
+        print("\n=== Testing Weekly Progress API ===")
+        
+        if not self.auth_token:
+            self.log_test("Weekly Progress API", False, "No auth token available")
+            return
+        
+        response = self.make_request("GET", "/tasks/weekly-progress", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            weekly_progress = response.json()
+            
+            # Verify structure
+            required_fields = ["week_start", "week_end", "daily_progress", "week_total_tasks", "week_completed_tasks", "week_completion_percentage"]
+            if all(field in weekly_progress for field in required_fields):
+                self.log_test("Weekly Progress Structure", True, "Weekly progress has all required fields")
+                
+                # Verify week calculation (Monday to Sunday)
+                week_start = datetime.strptime(weekly_progress["week_start"], "%Y-%m-%d").date()
+                week_end = datetime.strptime(weekly_progress["week_end"], "%Y-%m-%d").date()
+                
+                if week_start.weekday() == 0:  # Monday is 0
+                    self.log_test("Week Start Monday", True, "Week correctly starts on Monday")
+                else:
+                    self.log_test("Week Start Monday", False, f"Week starts on {week_start.strftime('%A')}, should be Monday")
+                
+                if week_end.weekday() == 6:  # Sunday is 6
+                    self.log_test("Week End Sunday", True, "Week correctly ends on Sunday")
+                else:
+                    self.log_test("Week End Sunday", False, f"Week ends on {week_end.strftime('%A')}, should be Sunday")
+                
+                # Verify 7 days of daily progress
+                daily_progress = weekly_progress["daily_progress"]
+                if isinstance(daily_progress, list) and len(daily_progress) == 7:
+                    self.log_test("Weekly Daily Progress", True, "Weekly progress contains 7 days")
+                    
+                    # Verify daily progress structure
+                    if daily_progress:
+                        day = daily_progress[0]
+                        required_day_fields = ["date", "total_tasks", "completed_tasks", "completion_percentage", "tasks"]
+                        if all(field in day for field in required_day_fields):
+                            self.log_test("Weekly Daily Structure", True, "Daily progress in weekly view has correct structure")
+                        else:
+                            self.log_test("Weekly Daily Structure", False, f"Missing fields in daily progress: {day}")
+                    
+                    # Verify week totals calculation
+                    calculated_total = sum(day["total_tasks"] for day in daily_progress)
+                    calculated_completed = sum(day["completed_tasks"] for day in daily_progress)
+                    
+                    if calculated_total == weekly_progress["week_total_tasks"]:
+                        self.log_test("Week Total Calculation", True, "Week total tasks calculated correctly")
+                    else:
+                        self.log_test("Week Total Calculation", False, f"Expected {calculated_total}, got {weekly_progress['week_total_tasks']}")
+                    
+                    if calculated_completed == weekly_progress["week_completed_tasks"]:
+                        self.log_test("Week Completed Calculation", True, "Week completed tasks calculated correctly")
+                    else:
+                        self.log_test("Week Completed Calculation", False, f"Expected {calculated_completed}, got {weekly_progress['week_completed_tasks']}")
+                    
+                    # Verify completion percentage
+                    if calculated_total > 0:
+                        expected_percentage = (calculated_completed / calculated_total) * 100
+                        actual_percentage = weekly_progress["week_completion_percentage"]
+                        if abs(expected_percentage - actual_percentage) < 0.01:
+                            self.log_test("Week Percentage Calculation", True, "Week completion percentage calculated correctly")
+                        else:
+                            self.log_test("Week Percentage Calculation", False, f"Expected {expected_percentage:.2f}%, got {actual_percentage:.2f}%")
+                    
+                else:
+                    self.log_test("Weekly Daily Progress", False, f"Expected 7 days, got {len(daily_progress) if isinstance(daily_progress, list) else 'non-list'}")
+                
+            else:
+                self.log_test("Weekly Progress Structure", False, f"Missing required fields: {weekly_progress}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Weekly Progress API", False, f"Failed to get weekly progress: {error_msg}")
+    
+    def test_date_specific_statistics(self):
+        """Test statistics endpoint with specific dates"""
+        print("\n=== Testing Date-Specific Statistics ===")
+        
+        if not self.auth_token:
+            self.log_test("Date-Specific Statistics", False, "No auth token available")
+            return
+        
+        # Test stats for today (default)
+        response = self.make_request("GET", "/tasks/stats", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            stats = response.json()
+            today = date.today().strftime("%Y-%m-%d")
+            if stats.get("date") == today:
+                self.log_test("Default Stats Date", True, f"Stats default to today's date: {today}")
+            else:
+                self.log_test("Default Stats Date", False, f"Expected date {today}, got {stats.get('date')}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Default Stats Date", False, f"Failed to get default stats: {error_msg}")
+        
+        # Test stats for specific future date
+        future_date = (date.today() + timedelta(days=3)).strftime("%Y-%m-%d")
+        response = self.make_request("GET", f"/tasks/stats?task_date={future_date}", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            stats = response.json()
+            if stats.get("date") == future_date:
+                self.log_test("Future Date Stats", True, f"Stats retrieved for future date: {future_date}")
+                
+                # Verify structure
+                required_fields = ["date", "total_tasks", "completed_tasks", "remaining_tasks", "completion_percentage"]
+                if all(field in stats for field in required_fields):
+                    self.log_test("Future Stats Structure", True, "Future date stats have correct structure")
+                else:
+                    self.log_test("Future Stats Structure", False, f"Missing fields in stats: {stats}")
+            else:
+                self.log_test("Future Date Stats", False, f"Expected date {future_date}, got {stats.get('date')}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Future Date Stats", False, f"Failed to get future stats: {error_msg}")
+        
+        # Test stats for specific past date
+        past_date = (date.today() - timedelta(days=2)).strftime("%Y-%m-%d")
+        response = self.make_request("GET", f"/tasks/stats?task_date={past_date}", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            stats = response.json()
+            if stats.get("date") == past_date:
+                self.log_test("Past Date Stats", True, f"Stats retrieved for past date: {past_date}")
+            else:
+                self.log_test("Past Date Stats", False, f"Expected date {past_date}, got {stats.get('date')}")
+        else:
+            error_msg = response.json().get("detail", "Unknown error") if response else "No response"
+            self.log_test("Past Date Stats", False, f"Failed to get past stats: {error_msg}")
+    
+    def test_date_isolation_and_user_isolation(self):
+        """Test that tasks are properly isolated by date and user"""
+        print("\n=== Testing Date and User Isolation ===")
+        
+        if not self.auth_token:
+            self.log_test("Date and User Isolation", False, "No auth token available")
+            return
+        
+        # Create tasks for different dates
+        dates_and_tasks = [
+            (date.today().strftime("%Y-%m-%d"), "Today's math homework"),
+            ((date.today() + timedelta(days=1)).strftime("%Y-%m-%d"), "Tomorrow's science project"),
+            ((date.today() - timedelta(days=1)).strftime("%Y-%m-%d"), "Yesterday's reading assignment")
+        ]
+        
+        created_task_ids = []
+        
+        for task_date, title in dates_and_tasks:
+            task_data = {"title": title, "task_date": task_date}
+            response = self.make_request("POST", "/tasks", task_data, headers=self.get_auth_headers())
+            
+            if response and response.status_code == 200:
+                task = response.json()
+                created_task_ids.append((task["id"], task_date))
+        
+        # Verify date isolation - tasks for each date should only appear in their respective date queries
+        for task_id, task_date in created_task_ids:
+            response = self.make_request("GET", f"/tasks?task_date={task_date}", headers=self.get_auth_headers())
+            
+            if response and response.status_code == 200:
+                tasks = response.json()
+                task_found = any(t["id"] == task_id for t in tasks)
+                other_date_tasks = [t for t in tasks if t["task_date"] != task_date]
+                
+                if task_found and not other_date_tasks:
+                    self.log_test(f"Date Isolation {task_date}", True, f"Task correctly isolated to date {task_date}")
+                else:
+                    self.log_test(f"Date Isolation {task_date}", False, f"Date isolation failed for {task_date}")
+        
+        # Test that getting tasks without date parameter only returns today's tasks
+        today = date.today().strftime("%Y-%m-%d")
+        response = self.make_request("GET", "/tasks", headers=self.get_auth_headers())
+        
+        if response and response.status_code == 200:
+            tasks = response.json()
+            all_today = all(t["task_date"] == today for t in tasks)
+            
+            if all_today:
+                self.log_test("Default Date Filtering", True, "Default task query only returns today's tasks")
+            else:
+                self.log_test("Default Date Filtering", False, "Default task query returned tasks from other dates")
+        
+        # Clean up created tasks
+        for task_id, _ in created_task_ids:
+            self.make_request("DELETE", f"/tasks/{task_id}", headers=self.get_auth_headers())
+    
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Kid-Friendly Task Planner Backend API Tests")
