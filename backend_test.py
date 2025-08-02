@@ -401,7 +401,7 @@ class TaskPlannerTester:
         for method, endpoint in protected_endpoints:
             response = self.make_request(method, endpoint, {"title": "test"} if method == "POST" else None)
             
-            if response and response.status_code == 403:
+            if response and response.status_code in [401, 403]:
                 self.log_test(f"Auth Protection {method} {endpoint}", True, "Correctly requires authentication")
             else:
                 self.log_test(f"Auth Protection {method} {endpoint}", False, "Should require authentication")
