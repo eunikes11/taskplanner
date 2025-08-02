@@ -409,6 +409,8 @@ const TaskManager = () => {
   const [showDashboard, setShowDashboard] = useState(false);
   const [draggedTask, setDraggedTask] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [breakMinutes, setBreakMinutes] = useState(25);
   const { user, logout, token } = useAuth();
 
   const api = axios.create({
